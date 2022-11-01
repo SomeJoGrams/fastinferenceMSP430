@@ -6,7 +6,7 @@ import numpy as np
 import copy
 
 from ..Util import NumpyEncoder, dynamic_import 
-#XXX: This class currently also takes care of all ensemble related loading/storing. This is okayish, but should not become more complicated. Otherweise we should put this into the Ensemble directly. However, then storing models becomes weird because we have to provide the out_pathes etc to to_dict method. Also circular dependencies can become an issue then
+#: This class currently also takes care of all ensemble related loading/storing. This is okayish, but should not become more complicated. Otherweise we should put this into the Ensemble directly. However, then storing models becomes weird because we have to provide the out_pathes etc to to_dict method. Also circular dependencies can become an issue then
 
 
 class Model():
@@ -107,8 +107,10 @@ class Model():
         os.makedirs(out_path, exist_ok = True)
         
         to_implementation = dynamic_import("fastinference.implementations.{}.{}.implement".format(self.category,implementation_type), "to_implementation")
-        self_copy = copy.deepcopy(self)
-        to_implementation(self_copy, out_path, out_name, **kwargs)
+        # self_copy = copy.deepcopy(self) # an error gets thrown here...
+        # means that an object gets created, that uses a weak reference, a reference, that is lost outside a function
+        # to_implementation(self_copy, out_path, out_name, **kwargs)
+        to_implementation(self, out_path, out_name, **kwargs)
 
     def to_dict(self):
         """Transforms this model into a dictionary format.

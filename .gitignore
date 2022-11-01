@@ -10,3 +10,6 @@ docs/make.bat
 /*.egg-info
 *.json
 __pycache__
+tests/msp430Models/temporary
+tests/generatedModels/data
+tests/generatedModels/lightning_logs

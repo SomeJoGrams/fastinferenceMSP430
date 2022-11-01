@@ -105,6 +105,7 @@ class Step(Layer):
         super().__init__(input_shape, input_shape, "step")
 
         self.threshold = threshold
+        self.signs = []
         self.low = low 
         self.high = high
         self.threshold_is_high = True

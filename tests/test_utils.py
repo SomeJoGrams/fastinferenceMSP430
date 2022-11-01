@@ -7,11 +7,19 @@ import itertools
 import sys
 import os
 import subprocess
+import json
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.linear_model import RidgeClassifier
 
+
+
 from sklearn.tree import DecisionTreeClassifier
 
+# help to find the local (not with pip installed) fastinference package
+import pathlib
+curPathParent = pathlib.Path(__file__).parent.parent
+print(curPathParent)
+sys.path.append(str(curPathParent)) # add the upper directory to find the simplePackage , es wurde nicht in nen STRING umgewandelt
 import fastinference.Loader
 
 from sklearn.metrics import accuracy_score
@@ -23,7 +31,7 @@ import numpy as np
 import pandas as pd
 import os
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler,MinMaxScaler,RobustScaler
 from sklearn.model_selection import train_test_split
 from scipy.io.arff import loadarff
 import urllib.request
@@ -100,14 +108,20 @@ def get_dataset(dataset, tmpdir = None, split = 0.3):
         Y = np.array([0 if y == 'g' else 1 for y in Y])
         XTrain, XTest, YTrain, YTest = train_test_split(X, Y, test_size=split, random_state=42)
     elif dataset == "fashion" or dataset == "mnist":
-        def load_mnist(path, kind='train'):
+        def load_mnist(path, kind='train',downscaleSize=(14,14)):
             # Taken from https://github.com/zalandoresearch/fashion-mnist/blob/master/utils/mnist_reader.py
             import os
             import gzip
             import numpy as np
 
             """Load MNIST data from `path`"""
+            # imagesPath = os.path.join(path,"downscaledImages%s%s.npy"%downscaleSize[0] %downscaleSize[1])
+            
+
             labels_path = os.path.join(path,'%s-labels-idx1-ubyte.gz'% kind)
+            # if (os.path.isfile(imagesPath)):
+            #     memArray = np.lib.format.open_memmap(imagesPath) # load images as numpy memmap
+            # else:
             images_path = os.path.join(path,'%s-images-idx3-ubyte.gz'% kind)
 
             with gzip.open(labels_path, 'rb') as lbpath:
@@ -115,7 +129,48 @@ def get_dataset(dataset, tmpdir = None, split = 0.3):
 
             with gzip.open(images_path, 'rb') as imgpath:
                 images = np.frombuffer(imgpath.read(), dtype=np.uint8, offset=16).reshape(len(labels), 784)
+            
 
+
+            # # TODO remove after Testing
+            # # TODO only use if needed
+            # print("original", (images[0:1]))
+            # print("original shape", np.shape(images)) #  (600000, with 784 values
+            # print("the length", len(images))
+            # import torchvision.transforms.functional as torchTransforms
+            # import torch
+            # print(images[0])
+            # print(len(images))
+            # print(len(images[0]))
+            # print(images.size)
+            # print(images[0].size)
+
+            scaledImages = np.array([])
+            # ind = 2
+            # for id,image in enumerate(images): # 60000 images in train set
+            #     reshaped = torch.reshape(torch.from_numpy(image.copy()),(1,28,28)) # copy the image to supress warning
+            #     resized = torchTransforms.resize(reshaped,(14,14)) # scale the image down
+            #     scaled = torch.reshape(resized,(1,14*14)) # the down scaled image is flattened
+                # if (id+1 % 10000 == 0):
+                #     break
+                # trying to find the right format
+                # print("the image size", (scaled.size()))
+                # print("the scaled image", scaled[0])
+                # print("the scaled image2", scaled)
+                # print("the scaled image3", scaled[0].numpy())
+                # scaledImages = np.append(scaledImages,scaled[0].numpy(),axis=0)
+                # ind = ind - 1
+                # if (ind == 0):
+                #     break
+            # print("the scaled images")
+            # print(scaledImages)
+            # print("exiting for now")
+            # sys.exit()
+            # print("the final array", np.asarray(scaledImages))
+            # print(scaledImages[0])
+            # print("second")
+            # print(scaledImages[1])
+            # images = scaledImages
             return images, labels
 
         if dataset == "fashion":
@@ -144,6 +199,7 @@ def get_dataset(dataset, tmpdir = None, split = 0.3):
     elif dataset == "eeg":
         eeg_path = download("https://archive.ics.uci.edu/ml/machine-learning-databases/00264/EEG%20Eye%20State.arff", "eeg.arff", tmpdir)
         
+
         df = read_arff(eeg_path, "eyeDetection")
         df = pd.get_dummies(df)
         df.dropna(axis=1, inplace=True)
@@ -151,7 +207,56 @@ def get_dataset(dataset, tmpdir = None, split = 0.3):
         df = df.drop("label", axis=1)
 
         X = df.values.astype(np.float64)
-        XTrain, XTest, YTrain, YTest = train_test_split(X, Y, test_size=split, random_state=42)
+        XTrain, XTest, YTrain, YTest = train_test_split(X, Y, test_size=split, random_state=23)
+
+        # edit the Train Sets to have no comma
+        # XTrain = np.multiply(XTrain, 100)
+        # XTrain = np.floor(XTrain)
+        # YTrain = np.multiply(YTrain, 100)
+        # YTrain = np.floor(YTrain)
+        
+        scaler1 = StandardScaler()
+        #scaler1 = MinMaxScaler((-1,1))
+        #scaler1 = RobustScaler()
+        
+        # scalerTrain = scaler1.fit(XTrain)
+        # scalerTest = scaler1.fit(XTest)
+
+        XTrain = scaler1.fit_transform(XTrain)
+        XTest = scaler1.fit_transform(XTest)
+        
+        print("xvalues,yvalues", XTest,YTest)
+        testWeightsPath = ""
+        if tmpdir is None:
+            testWeightsPath = os.path.join(tempfile.gettempdir(), "testWeights")
+        else:
+            testWeightsPath = os.path.join(tmpdir, "testWeights")
+        # save test inputs for later use
+        with open(os.path.join(testWeightsPath,"testMyNeuralNetWeights.txt"),"w") as f:
+            for ind,valList in enumerate(XTest):
+                f.write(str(valList) + ":" + str(YTest[ind]) + "\n")
+
+
+        for bitCount in [16,32]:
+            with open(os.path.join(testWeightsPath,"neuralWeightsNormalized" + str(bitCount) + "bit.txt"),"w") as f:
+                stringVals = ""
+                bitCast = ""
+                if (bitCount == 16):
+                    bitCast = "_Q15"
+                elif (bitCount == 32):
+                    bitCast = "_IQ31"
+                for ind,batch in enumerate(XTest):
+                    for val in batch:
+                        stringVals = stringVals + bitCast + "(" + str(val) + "),"
+                    stringVals = stringVals + str(YTest[ind]) + "\n"
+
+                f.write(stringVals + "\n")
+        
+        # X_val = scaler.transform(X_val)
+        # X_test = scaler.transform(X_test)
+        # X_train, y_train = np.array(X_train), np.array(y_train)
+        # X_val, y_val = np.array(X_val), np.array(y_val)
+        # X_test, y_test = np.array(X_test), np.array(y_test)
     else:
         raise ValueError("Unsupported dataset provided to get_dataset in test_utils.py: {}. Currently supported are {mnist, fashion eeg, magic}".format(dataset))
         # return None, None
@@ -232,7 +337,7 @@ def run_experiment(out_path, name, feature_type, label_type, benchmark_file, n_r
 
     Note 1: This code requires cmake for the compilation.
     Note 2: This call will likely only work on Linux / MAC as it utilizes cp to move some files around
-
+    
     TODO: Make it platform independent. 
 
     Args:
@@ -250,6 +355,8 @@ def run_experiment(out_path, name, feature_type, label_type, benchmark_file, n_r
     cmake . -DMODELNAME={name} -DLABEL_TYPE={label_type} -DFEATURE_TYPE={feature_type} &&
     make""".replace("{outpath}", out_path).replace("{name}", name).replace("{feature_type}", feature_type).replace("{label_type}", label_type).replace("{test_file}", benchmark_file)
     
+    # TODO add compiler arguments + compiler of code composer studio + linker args
+
     print("Calling {}".format(prepare_and_compile))
     subprocess.call(prepare_and_compile, shell=True)
 
@@ -306,8 +413,14 @@ def prepare_fastinference(model_path, out_path, implementation_type, implementat
         ))
         if len(base_optimizer) > 0 and base_optimizer[0] is not None:
             fi_model.optimize(base_optimizer, base_optimizer_args)
-        fi_model.implement(out_path, "model", "cpp.{}".format(implementation_type), **implementation_args)
+
+        # TODO add the c path and the implementation type as arguements
+        # currentProgrammingLanguage = "cpp"
+        currentProgrammingLanguage = "c" 
+        implementation_type = implementation_type
+        fi_model.implement(out_path, "model", "{}.{}".format(currentProgrammingLanguage,implementation_type), **implementation_args)
     
+    # TODO use the for the programming languange fitting compiler + settings
     prepare_and_compile = """
     cp ./main.cpp {outpath} && 
     cp ./CMakeLists.txt {outpath}
@@ -316,23 +429,107 @@ def prepare_fastinference(model_path, out_path, implementation_type, implementat
     print("Calling {}".format(prepare_and_compile))
     subprocess.call(prepare_and_compile, shell=True)
 
-def test_implementations(model, dataset, split, implementations, base_optimizers = [([None], [{}])], ensemble_optimizers = [([None], [{}])], out_path = ".", model_name="Model", n_repeat=5):
-    print("Loading {}".format(dataset))
+def test_implementations(model, dataset, split, implementations, base_optimizers = [([None], [{}])], ensemble_optimizers = [([None], [{}])], out_path = ".", model_name="Model", n_repeat=5,trainedModelPath=None):
+
     XTrain, YTrain, XTest, YTest = get_dataset(dataset,out_path,split)
+    path_to_model = None
+    if (trainedModelPath == None):
+        print("Loading {}".format(dataset))
 
-    print("Fitting model")
-    model.fit(XTrain, YTrain)
+        print("Fitting model")
+        model.fit(XTrain, YTrain)
 
-    print("Storing model")
-    acc = accuracy_score(model.predict(XTest), YTest)*100.0
-    if isinstance(model, (DecisionTreeClassifier, RidgeClassifier, QuadraticDiscriminantAnalysis, RandomForestClassifier)):
-        fimodel = fastinference.Loader.model_from_sklearn(model, name = model_name, accuracy = acc)
-        path_to_model = fastinference.Loader.model_to_json(fimodel, os.path.join(out_path), file_name=model_name)
-        print("SK ACC:", acc)
-        print("MY ACC:", accuracy_score(fimodel.predict(XTest), YTest)*100.0)
-    else:
-        path_to_model = model.store(out_path, acc, model_name)
-        
+        print("Storing model")
+        acc = 0
+        if (dataset == "eeg"):
+            from sklearn.metrics import zero_one_loss
+            modelPrediction = model.predict(XTest).detach()
+            # torch.set_printoptions(profile="full")
+            # print("the result labels", YTest)
+            # transformedLabels = []
+            # for inp in YTest:
+            #     if (inp == 0):
+            #         transformedLabels.append((0,1)) # class 0 
+            #     else: # inp == 1
+            #         transformedLabels.append((1,0)) # class 1
+            # transformedLabels = torch.tensor(transformedLabels)
+
+            # print("predic", modelPrediction)
+
+            zeroOneLoss = zero_one_loss(modelPrediction,YTest)
+            # print("the zero one loss", zeroOneLoss)
+            # torch.set_printoptions(profile="full")
+            acc = (1-zeroOneLoss)*100.0 # detach to allow with this
+            print("the accuracy", acc)
+            djson = {
+                "accuracy":acc,
+                "name":model_name
+            }
+            
+            with open(os.path.join(out_path, model_name + ".json"), "w") as outfile:  
+                json.dump(djson, outfile) #, cls=NumpyEncoder
+
+            print("running on some extra cases")
+            XExtra, YExtra = XTest[0:int(len(YTest)/2)], YTest[0:int(len(YTest)/2)]
+            
+
+            # also printing the first 4 extra cases for easier debugging
+            extraElementLimit = 0
+            if (len(XExtra) >= 10):
+                extraElementLimit = 10
+            else:
+                extraElementLimit = len(XExtra)
+            XExtraCut, YExtraCut = XExtra[0:extraElementLimit], YExtra[0:extraElementLimit]
+            print("the 10 elements")
+            print("the inputs vals" ,XExtraCut)
+            predicition0 = model.predictLogits(XExtraCut,printForward=True)
+            print("the logits",predicition0)
+            print("the labels",YExtraCut)
+            print("\n\n")
+
+            extraPrediction = model.predictLogits(XExtra).detach()
+            # convert the extraPrediction to an argMax list
+            extraPredictionArgMax = []
+            for (a,b) in extraPrediction:
+                if (a > b):
+                    extraPredictionArgMax.append(0)
+                else:
+                    extraPredictionArgMax.append(1)
+            for bits in [16,32]:
+                with open(os.path.join(out_path,"testWeights","neuralWeightsNormalizedPredicted" + str(bits) + "bit.txt"), "w") as logitTests:
+                    for indX,vals in enumerate(XExtra): # 
+                        stringVals = ""
+                        dataType = ""
+                        if (bits == 32):
+                            dataType = "_IQ31("
+                        elif (bits == 16):
+                            dataType = "_Q15("
+                        else:
+                            print("the sectionBitLength is not supported")
+                            sys.exit()
+                        for ind,val in enumerate(vals):
+                            stringVals = stringVals + dataType + str(val) + "),"
+#                        stringVals = stringVals + (str(YExtra[indX]) + "\n")
+                        stringVals = stringVals + (str(extraPredictionArgMax[indX]) + "\n")# use this to compare that pytorch the same label
+                        logitTests.write(stringVals)
+
+        else:
+            acc = accuracy_score(model.predict(XTest), YTest)*100.0
+        if isinstance(model, (DecisionTreeClassifier, RidgeClassifier, QuadraticDiscriminantAnalysis, RandomForestClassifier)):
+            fimodel = fastinference.Loader.model_from_sklearn(model, name = model_name, accuracy = acc)
+            path_to_model = fastinference.Loader.model_to_json(fimodel, os.path.join(out_path), file_name=model_name)
+            print("SK ACC:", acc)
+            print("MY ACC:", accuracy_score(fimodel.predict(XTest), YTest)*100.0)
+        else:
+            path_to_model = model.store(out_path, acc, model_name)
+    else: # model is already trained so we dont need to calc an accuracy
+        path_to_model = trainedModelPath + ".onnx"
+        print("the stored model accuracy is:")
+        with open(trainedModelPath + ".json", "r") as outfile:
+                print(json.load(outfile)) #, cls=NumpyEncoder
+
+
+
     print("Storing test data")
     dfTest = pd.concat([pd.DataFrame(XTest, columns=["f{}".format(i) for i in range(len(XTrain[0]))]), pd.DataFrame(YTest,columns=["label"])], axis=1)
     path_to_testfile = os.path.join(out_path, "testing.csv")

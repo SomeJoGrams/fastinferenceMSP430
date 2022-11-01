@@ -1,23 +1,28 @@
 name: fi
 channels:
   - pytorch
-  # - conda-forge
+  - conda-forge
   - defaults
 dependencies:
-  - cmake
-  - python 
-  - jinja2
-  - scikit-learn
-  - numpy
-  - pytorch 
-  - torchvision 
-  - torchaudio 
+  - cmake=3.21.2
+  - python=3.9.7
+  - protobuf=3.18.0
+  - python_abi=3.9
+  - jinja2=3.0.1
+  - scikit-learn=0.24.2
+  - numpy=1.21.2
+  - pytorch=1.9.1 
+  - torchmetrics=0.6.0
   - cudatoolkit=10.2
   - xgboost
+  - pandas
+  - onnx=1.10.1 
+  - setuptools=59.5.0
   - pip
   - pip:
-    - onnx
+    - onnxruntime==1.9.0
+    - pytorch-lightning==1.4.7
+    - pandas
     - cvxpy
-    - onnxruntime 
-    - pip install git+https://github.com/sbuschjaeger/PyPruning.git
-    - -e file:. 
+    - git+https://github.com/sbuschjaeger/PyPruning.git
+

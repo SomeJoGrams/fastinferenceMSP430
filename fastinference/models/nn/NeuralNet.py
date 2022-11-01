@@ -106,9 +106,10 @@ class NeuralNet(Model):
         # Add implicit dimension for number of examples. We only consider single-example inference at the moment.
         input_shape = (1, graph.input[0].type.tensor_type.shape.dim[1].dim_value)
         n_classes = graph.output[0].type.tensor_type.shape.dim[1].dim_value
-
         # Iterate all layers in the ONNX graph and generate code depending on the layer type
         #node_iterator = iter(enumerate(graph.node))
+        for node in graph.node: # print the list of nodes
+            print("current op", node.op_type)
         for node_id, node in enumerate(graph.node):
             print('Checking {}.'.format(node.op_type))
 
@@ -118,12 +119,11 @@ class NeuralNet(Model):
                 threshold = fastinference.Util.get_constant(node)
                 high = fastinference.Util.get_constant(graph.node[node_id + 2])
                 low = fastinference.Util.get_constant(graph.node[node_id + 3])
-
                 # [dim.dim_value for dim in graph.node[node_id + 1].type.tensor_type.shape.dim]
                 # graph.node[node_id + 1]
                 #fastinference.Util.get_tensor_shape(graph, graph.node[node_id + 1].input[0])
                 layer = Step(input_shape, threshold, low, high)
-            elif node.op_type in ['Constant', 'Shape', 'Slice', 'Concat', 'Gather', 'Greater', 'Where', 'Unsqueeze', 'Concat']:
+            elif node.op_type in ['Constant', 'Shape', 'Slice', 'Concat', 'Gather', 'Greater', 'Where', 'Unsqueeze', 'Concat']: # , "Identity"
                 print('Layer {} skipped.'.format(node.op_type))
                 continue
             else:
